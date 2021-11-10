@@ -1,0 +1,32 @@
+{
+    "name": "DFRobot_xia_mi_Board",
+    "version": "0.6.0",
+    "description": "",
+    "dependencies": {
+        "core": "*",
+        "microphone": "*"
+    },
+    "files": [
+        "README.md",
+        "custom.ts",
+        "sendBuffer.asm",
+        "ws2812b.ts",
+        "NecIR.cpp",
+        "i2c.cpp",
+        "_locales/zh-cn/DFRobot_xia_mi_Board-strings.json",
+        "_locales/zh-tw/DFRobot_xia_mi_Board-strings.json",
+        "shims.d.ts",
+        "enums.d.ts"
+    ],
+    "testFiles": [
+        "test.ts"
+    ],
+    "targetVersions": {
+        "target": "4.0.16",
+        "targetId": "microbit"
+    },
+    "supportedTargets": [
+        "microbit"
+    ],
+    "preferredEditor": "tsprj"
+}
