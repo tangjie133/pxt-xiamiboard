@@ -82,6 +82,15 @@ enum AHT20{
 namespace xiamiBoard{
 
     const i2cAddr = 0x10;
+
+    const SHTC3_ADDR = 0x70
+    const SHTC3_CMD_SOFT_RESET = 0x805D
+    const SHTC3_READ_ID_CMD = 0xEFC8
+    const SHT3C_WAKEUP_CMD = 0x3517
+    const SHT3C_GATHER_CMD = 0x7866
+    const SHT3C_GAHTER_CMD = 0x7CA2
+    const SHT3C_SLEEP_CMD = 0xB098
+
     let irstate:number;
     let state:number;
     /**
@@ -646,16 +655,25 @@ namespace xiamiBoard{
     export function ledBlank() {
         showColor(0)
     }
-    function AHT20Init(){
-        pins.i2cWriteNumber(0x38, 0xBA, NumberFormat.Int8LE);
-        let data=pins.i2cReadNumber(0x38, NumberFormat.Int8LE);
-        if((data & 0x08) != 1){
-        let buf=pins.createBuffer(3)
-            buf[0]=0xBE;
-            buf[1]=0X08;
-            buf[2]=0x00;
-            pins.i2cWriteBuffer(0x38, buf)
-        }
+
+    function SHT3CInit(){
+        writeCommand(SHT3C_WAKEUP_CMD);
+        basic.pause(10);
+        writeCommand(SHTC3_CMD_SOFT_RESET);
+        basic.pause(10); 
+        writeCommand(SHTC3_READ_ID_CMD);
+        let buf = pins.i2cReadBuffer(SHTC3_ADDR,2);
+        let id = buf[0]<<8 | buf[1]
+        while ((id & 0x083f) != 0x0807);
+        writeCommand(SHT3C_SLEEP_CMD);
+        //serial.writeValue("x", id & 0x083f)
+    }
+
+    function writeCommand(cmd:number):void{
+        let buf = pins.createBuffer(2);
+        buf[0] = cmd >> 8;
+        buf[1] = cmd & 0xff;
+        pins.i2cWriteBuffer(SHTC3_ADDR,buf);
     }
     /**
      * 获取温湿度数据
@@ -663,18 +681,15 @@ namespace xiamiBoard{
     //% weight=77
     //% block="read %state"
     export function readAHT20(state:AHT20):number{
-        let buf=pins.createBuffer(3);
-            buf[0]=0xAC;
-            buf[1]=0X33;
-            buf[2]=0x00;
-            pins.i2cWriteBuffer(0x38, buf);
-        let buf1=pins.i2cReadBuffer(0x38, 7);
+        writeCommand(SHT3C_WAKEUP_CMD);
+        basic.pause(10)
+        writeCommand(SHT3C_GATHER_CMD);
+        basic.pause(500);
+        let buf = pins.i2cReadBuffer(SHTC3_ADDR,6);
         let data;
         switch(state){
-            case AHT20.HUM:data=((buf1[1] << 12) + (buf1[2] << 4) + (buf1[3] >> 4)) / 1048576 * 100, 2;break;
-            case AHT20.TEMP:data=(((buf1[3] & 0x0f) << 16) + (buf1[4] << 8) + (buf1[5])) / 1048576 * 200 - 50
-                , 2;break;
-            
+            case AHT20.HUM:data=(buf[3] << 8 | buf[4])*100 /65536;break;
+            case AHT20.TEMP:data=((buf[0] << 8 | buf[1])*175/65536)-45;break;
             default:break;
         }
         return Math.round(data);
@@ -692,10 +707,10 @@ namespace xiamiBoard{
     //% weight=101
     export function initXiaMiBoard():void{
         //init();
-        basic.pause(30)
-        AHT20Init()
-        basic.pause(30)
-        initDisplay()
+        basic.pause(30);
+        SHT3CInit();
+        basic.pause(30);
+        initDisplay();
 
     }
 
@@ -714,4 +729,25 @@ namespace xiamiBoard{
         return _data;
     }
 
+}
+
+function checkCrc(data1:number, data2:number, crcValue:number){
+    let crc = 0xFF;
+    let crcData= pins.createBuffer(2);
+    crcData[0] = data1;
+    crcData[1] = data2;
+    for (let i = 0; i < 2; i++) {
+        crc ^= crcData[i];
+        for (let bit = 8; bit > 0; --bit) {
+            if (crc & 0x80) {
+                crc = (crc << 1) ^ 0x31;
+            } else {
+                crc = (crc << 1);
+            }
+        }
+    }
+    if (crc != crcValue) {
+        return false;
+    }
+    return true;
 }
